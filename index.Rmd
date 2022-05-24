@@ -1,1 +1,161 @@
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(maps)
+library(ggmap)
+library(stringr)
+library(mapproj)
+incarceration_data <- read.csv("https://raw.githubusercontent.com/vera-institute/incarceration-trends/master/incarceration_trends.csv")
 
+#black and white people in prison by and black and white population,in Fulton GA 
+GA_data <- incarceration_data %>%
+  filter(state == "GA") %>% 
+  filter(county_name == "Fulton County") %>%
+  select(year, black_pop_15to64, black_prison_pop, white_pop_15to64, white_prison_pop)
+
+#GA data with ratio and only with available data
+prison_percentage_black <- select(GA_data, year, black_pop_15to64, black_prison_pop)
+prison_percentage_black_percentage <-  mutate(prison_percentage_black, black_inc_ratio = black_prison_pop/black_pop_15to64)
+prison_percentage_white <-   select(GA_data, year, white_pop_15to64, white_prison_pop)
+prison_percentage_white_percentage <-   mutate(prison_percentage_white, white_inc_ratio = white_prison_pop/white_pop_15to64)
+
+prison_select <- select(GA_data, year, black_pop_15to64, black_prison_pop, white_pop_15to64, white_prison_pop) 
+prison_percentage <- mutate(prison_select, black_inc_ratio = black_prison_pop/black_pop_15to64, white_inc_ratio = white_prison_pop/white_pop_15to64)
+
+#percentage of black and white in prison,in Fulton GA after 1990
+year_prison_percentage <- filter(prison_percentage,year>= 1990,year<= 2016)
+
+#only year and percentages
+percetage_year_data <- year_prison_percentage %>%
+  select(year, black_inc_ratio, white_inc_ratio)
+
+#Value 1: Average incarceration ratio for black 
+value_1_black <- mean(percetage_year_data$black_inc_ratio)
+
+#Value 2: Average incarceration ratio for white 
+value_2_white <- mean(percetage_year_data$white_inc_ratio)
+
+#only year and percentages
+percetage_year_data <- year_prison_percentage %>%
+  select(year, black_inc_ratio, white_inc_ratio)
+
+#Value 3: Max incarcertation ratio for black 
+value_3_black <- max(percetage_year_data$black_inc_ratio)
+
+#Value 4: Max incarcertation ratio for white
+value_4_white <- max(percetage_year_data$white_inc_ratio)
+
+
+#plot year vs incarceration ratio of white and black in Futon County, GA
+graph_ga_data <- gather (
+  percetage_year_data,
+  key = race,
+  value = ratio, 
+  -year)
+
+#Line plot of year vs incarceration ratio of white and black in Futon County, GA
+ggplot(data = graph_ga_data, aes(x = year, y = ratio, group = race, color = race)) +
+  geom_line() +
+  geom_point() +
+  ggtitle("Ratio of Incarcerated Population to Total Population by Race Over Time in Fulton County, GA") +
+  labs(x= "Year", y= "Ratio") +
+  theme(
+    plot.title=element_text(size=14, lineheight=0.8, color="grey20",hjust=0.5),
+    axis.title.x=element_text(color="grey20"),
+    axis.title.y=element_text(color="grey20")
+  )
+
+## @knitr chunk2
+
+GA_data_2 <- incarceration_data %>%
+  filter(state == "GA") %>%
+  filter(year == "2010") %>%
+  select(black_pop_15to64, black_prison_pop, white_pop_15to64, white_prison_pop,commuting_zone)
+
+GA_data_2 <- mutate(GA_data_2, white_inc_ratio = white_prison_pop/white_pop_15to64)
+GA_data_2 <- mutate(GA_data_2, black_inc_ratio = black_prison_pop/black_pop_15to64)
+
+sorted_ga_data_2 <- GA_data_2 %>%
+  select(white_inc_ratio, black_inc_ratio, commuting_zone)
+
+
+#Data point 3
+maxb <- sorted_ga_data_2 %>%
+  filter(black_inc_ratio == max(black_inc_ratio, na.rm = TRUE))%>%
+  select(black_inc_ratio, commuting_zone)
+minb <- sorted_ga_data_2 %>%
+  filter(black_inc_ratio == min(black_inc_ratio, na.rm = TRUE))%>%
+  select(black_inc_ratio, commuting_zone)
+
+maxw <- sorted_ga_data_2 %>%
+  filter(white_inc_ratio == max(white_inc_ratio, na.rm = TRUE))%>%
+  select(white_inc_ratio, commuting_zone)
+minw <- sorted_ga_data_2 %>%
+  filter(white_inc_ratio == min(white_inc_ratio, na.rm = TRUE))%>%
+  select(white_inc_ratio, commuting_zone)
+
+graph_ga_data2 <- gather(
+  sorted_ga_data_2,
+  key = Race,
+  value = ratio,
+  -commuting_zone)
+
+ggplot(data = graph_ga_data2, aes(x = commuting_zone, y = ratio, group = Race, color = Race)) +
+  geom_point() +
+  ggtitle("Ratio of Incarcerated Population to Total Population by Race over Commuting zone in Fulton County, GA \nData: Vera Project 2020") +
+  labs(x= "Commuting Zone (mi)", y = "Ratio") +
+  theme(
+    plot.title=element_text(size=14, lineheight=0.8, color="grey20", hjust=0.5),
+    axis.title.x=element_text(color="grey20"),
+    axis.title.y=element_text(color="grey20"))
+
+## @knitr chunk3
+
+# Data plot 3
+GA_data_3 <- incarceration_data %>%
+  filter(state == "GA") %>%
+  filter(year == "2010") %>%
+  select(county_name, total_pop, total_jail_pop)
+
+GA_data_3 <- mutate(GA_data_3, Incarceration_Rate = total_jail_pop/total_pop) %>%
+  mutate(county = tolower(county_name)) # replace with lowercase for joining
+
+maxcounty <- GA_data_3 %>%
+  filter(Incarceration_Rate == max(Incarceration_Rate, na.rm = TRUE))%>%
+  select(Incarceration_Rate, county)
+mincounty <- GA_data_3 %>%
+  filter(Incarceration_Rate == min(Incarceration_Rate, na.rm = TRUE))%>%
+  select(Incarceration_Rate, county)
+
+stopwords = c(" county")
+GA_data_3$county <- gsub(paste0(stopwords,collapse = "|"),"", GA_data_3$county)
+
+
+# load state shapefile
+GA_shape <- map_data("county", region = "georgia")%>% 
+  rename(county = subregion)%>%
+  left_join(GA_data_3, by="county")
+
+# Draw the map setting the fill of each county using its incarceration rate
+blank_theme <- theme_bw() +
+  theme(
+    axis.line = element_blank(),        # remove axis lines
+    axis.text = element_blank(),        # remove axis labels
+    axis.ticks = element_blank(),       # remove axis ticks
+    axis.title = element_blank(),       # remove axis titles
+    plot.background = element_blank(),  # remove gray background
+    panel.grid.major = element_blank(), # remove major grid lines
+    panel.grid.minor = element_blank(), # remove minor grid lines
+    panel.border = element_blank()      # remove border around plot
+  )
+
+ggplot(GA_shape) +
+  geom_polygon(
+    mapping = aes(x = long, y = lat, group = group, fill = Incarceration_Rate),
+    color = "white", # show county outline
+    size = .1        # thinly stroked
+  ) +
+  coord_map() + # use a map-based coordinate system
+  scale_fill_continuous(low = "#132B43", high = "Red") +
+  labs(fill = "Incarceration Rate (percent of population)") +
+  blank_theme
